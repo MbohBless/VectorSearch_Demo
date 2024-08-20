@@ -48,11 +48,11 @@ echo "TARGET_COLLECTION=$TARGET_COLLECTION" >> .env
 echo "DATABASE_NAME=$DATABASE_NAME" >> .env
 echo "EMBEDDING_SERVICE_URL=$EMBEDDING_SERVICE_URL" >> .env
 
-if [[ -z "$HF_TOKEN" ]]; then
+if [[ -n "$HF_TOKEN" ]]; then
     echo "HF_TOKEN=$HF_TOKEN" >> .env
 fi
 
-if [[ -z "$GROQ_API_KEY" ]]; then
+if [[ -n "$GROQ_API_KEY" ]]; then
     echo "GROQ_API_KEY=$GROQ_API_KEY" >> .env
 fi
 
