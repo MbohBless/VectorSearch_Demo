@@ -5,9 +5,13 @@
     "features": {
         "ghcr.io/devcontainers-contrib/features/coverage-py:2": {}
       },
-    "postCreateCommand": "pip3 install --user -r requirements.txt",
-    "postAttachCommand": "/bin/bash .devcontainer/devbash.sh && code -r -e 'workbench.action.terminal.new' && code -r -e 'workbench.action.terminal.sendSequence' --args '{\"text\":\"source .env && streamlit run app.py && gh codespace ports visibility 8501:public -c $CODESPACE_NAME\\n\"}' && code -r -e 'workbench.action.terminal.new' && code -r -e 'workbench.action.terminal.sendSequence' --args '{\"text\":\"if [ -n \\\"$GROQ_API_KEY\\\" ]; then streamlit run app_llm.py && gh codespace ports visibility 8502:public -c $CODESPACE_NAME; else echo \\\"GROQ_API_KEY not set\\\"; fi\\n\"}'",
-     "customizations": {
+    "postCreateCommand": "pip3 install --user -r requirements.txt && /bin/bash .devcontainer/devbash.sh",
+    // "postAttachCommand": " && ",
+    "postAttachCommand": [
+        "streamlit run app.py && gh codespace ports visibility 8501:public -c $CODESPACE_NAME",
+        "/bin/bash -c 'if [ -n \"$GROQ_API_KEY\" ]; then streamlit run app_llm.py && gh codespace ports visibility 8502:public -c $CODESPACE_NAME; else echo \"GROQ_API_KEY not set\"; fi'"
+    ],
+    "customizations": {
         "codespaces": {
             "openFiles": [
                 "app.py",
