@@ -11,7 +11,7 @@
         "params": "/bin/bash .devcontainer/devbash.sh",
         "env": "source .env",
         "vector": "streamlit run app.py && gh codespace ports visibility 8501:public -c $CODESPACE_NAME",
-        "llm": "/bin/bash -c 'if [ -n \"$GROQ_API_KEY\" ]; then streamlit run app_llm.py && gh codespace ports visibility 8502:public -c $CODESPACE_NAME; else echo \"GROQ_API_KEY not set\"; fi'",
+        "llm": "/bin/bash -c 'if [ -n \"$GROQ_API_KEY\" ]; then streamlit run app_llm.py && gh codespace ports visibility 8502:public -c $CODESPACE_NAME; else echo \"GROQ_API_KEY not set\"; fi'"
     },
     "customizations": {
         "codespaces": {
