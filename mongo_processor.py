@@ -4,6 +4,8 @@ from langchain_core.documents import Document
 from tqdm.auto import tqdm
 from dotenv import load_dotenv
 from data_processor import create_embeddings
+from langchain_community.vectorstores import MongoDBAtlasVectorSearch
+from langchain_huggingface import HuggingFaceEmbeddings
 import os
 load_dotenv()
 
@@ -64,7 +66,8 @@ def get_mongodbAtlasEmbeddings(db_uri: str = userdata.get("DATABASE_URI"),
         db_uri,
         db_name + "." + collection_name,
         HuggingFaceEmbeddings(model_name=embedding_model),
-        index_name=atlas_vector_search_index)
+        index_name="book_index")
+ 
     return vector_search
 
 

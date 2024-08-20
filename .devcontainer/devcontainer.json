@@ -1,0 +1,39 @@
+// creating the dev container to handle the package installation 
+{
+    "name": "Python 3",
+    "image": "mcr.microsoft.com/devcontainers/python:0-3.11-bullseye",
+    "features": {
+        "ghcr.io/devcontainers-contrib/features/coverage-py:2": {}
+      },
+    "postCreateCommand": "pip3 install --user -r requirements.txt",
+    "postAttachCommand": {
+        
+        "params": "/bin/bash .devcontainer/devbash.sh",
+        "env": "source .env",
+        "vector": "streamlit run app.py && gh codespace ports visibility 8501:public -c $CODESPACE_NAME",
+        "llm": "/bin/bash -c 'if [ -n \"$GROQ_API_KEY\" ]; then streamlit run app_llm.py && gh codespace ports visibility 8502:public -c $CODESPACE_NAME; else echo \"GROQ_API_KEY not set\"; fi'",
+    },
+    "customizations": {
+        "codespaces": {
+            "openFiles": [
+                "app.py",
+                "app_llm.py",
+                ".env"
+            ]
+        }
+    },
+    "portsAttributes": {
+        "8501": {
+            "label": "Vector Search",
+            "onAutoForward": "notify"
+        },
+        "8502": {
+            "label": "LLM Search",
+            "onAutoForward": "notify"
+        }
+    },
+    "forwardPorts": [
+        8501,
+        8502
+    ]
+}
