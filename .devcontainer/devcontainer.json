@@ -6,13 +6,13 @@
         "ghcr.io/devcontainers-contrib/features/coverage-py:2": {}
       },
     "postCreateCommand": "pip3 install --user -r requirements.txt",
-    "postAttachCommand": "/bin/bash .devcontainer/devbash.sh && streamlit run app.py && gh codespace ports visibility 8501:public -c $CODESPACE_NAME",
+    "postAttachCommand": "/bin/bash .devcontainer/devbash.sh &&chmod +x llm_start.sh&&chmod +x vector_start.sh&& streamlit run app.py && gh codespace ports visibility 8501:public -c $CODESPACE_NAME",
     "customizations": {
         "codespaces": {
             "openFiles": [
                 "app.py",
                 "app_llm.py",
-                ".env"
+                "mongo_processor.py"
             ]
         }
     },
