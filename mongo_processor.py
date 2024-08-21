@@ -35,7 +35,7 @@ async def perform_document_upload(documents: List[Document],
     for document in tqdm(documents, desc="Creating content embeddings"):
         document_clean.append({
             "text": document.page_content,
-            "embeddings":  create_embeddings(document.page_content),
+            "embedding":  create_embeddings(document.page_content),
         }
         )
     collection.insert_many(document_clean)
@@ -94,7 +94,7 @@ def perform_document_retrieval(query: str,
         {
             "$vectorSearch": {
                 "index": "book_index",
-                "path": "embeddings",
+                "path": "embedding",
                 "queryVector": query_embedding,
                 "numCandidates": 100,
                 "limit": 5
@@ -102,8 +102,7 @@ def perform_document_retrieval(query: str,
         },
         {
             "$project": {
-                "text": 1,  # Include all fields of the document
-                # Include the similarity score
+                "text": 1,  
                 "score": {"$meta": "vectorSearchScore"}
             }
         }
