@@ -89,24 +89,21 @@ def perform_document_retrieval(query: str,
     client = MongoClient(database_uri)
     db = client[database_name]
     collection = db[collection_name]
-    query_embedding =  create_embeddings(query)
-    aggregation = [
-        {
-            "$vectorSearch": {
-                "index": "book_index",
-                "path": "embedding",
-                "queryVector": query_embedding,
-                "numCandidates": 100,
-                "limit": 5
-            }
-        },
-        {
-            "$project": {
-                "text": 1,  
-                "score": {"$meta": "vectorSearchScore"}
-            }
-        }
-    ]
+    query_embedding =  create_embeddings(query,local=False)
+    """
+    The aggregation pipeline below is used to find the most similar document to the query
+    so your task is to implement the aggregation pipeline that will find the most similar document to the query    
+    Ensure that the vector score is projected in the aggregation pipeline
+    
+    """
+    #********************************************
+    # Uncomment the code below to implement the aggregation pipeline
+    #********************************************    
+    # aggregation = [
+    #     # code here to implement the aggregation pipeline
+    #     # make sure you makes use of the query_embedding variable
+    #     # add as many aggregation stages as you need
+    # ]
 
     results = collection.aggregate(aggregation)
     client.close()

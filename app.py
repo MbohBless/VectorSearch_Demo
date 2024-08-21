@@ -3,16 +3,21 @@ import random
 import time
 from mongo_processor import perform_document_retrieval, perform_document_upload
 
+
 def response_generator(query):
     response = """**I found the following Segments for you:**\n\n"""
     # for word in response.split():
     #     yield word + " "
     #     time.sleep(0.05)
-    documents =  perform_document_retrieval(query)
-    
+    documents = perform_document_retrieval(query)
+
     for document in documents:
-        response += f"**Relevance Score**:"+str(document["score"])+ "\n\n" +"**Content**:"+ document['text'] +"\n\n"
+        response += f"**Relevance Score**:" + \
+            str(document.get("score", "0.0")) + "\n\n" + \
+            "**Content**:" + document['text'] + "\n\n"
     return response
+
+
 st.title("Vector Retrival with MongoDB vector search")
 # c = st.container()
 # Initialize chat history

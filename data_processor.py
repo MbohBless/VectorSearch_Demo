@@ -1,5 +1,5 @@
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+
 from tqdm.auto import tqdm
 from langchain_experimental.text_splitter import SemanticChunker
 from typing import List
@@ -45,6 +45,7 @@ def post_processing(document: Document, semantic: bool = True, model_name: str =
       List[Document]
     """
     if semantic:
+        from langchain_huggingface import HuggingFaceEmbeddings
         text_splitter = SemanticChunker(
             embeddings=HuggingFaceEmbeddings(model_name=model_name),
             breakpoint_threshold_type="percentile"
