@@ -1,0 +1,874 @@
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 1 of 45
+☰ Article Navigation
+The Ideal Versus the Real: Revisiting the
+History of Virtual Machines and Containers
+ALLISON RANDAL (https://orcid.org/0000-0003-0107-9032), University of Cambridge
+ACM Comput. Surv., Vol. 53, No. 1, Article 5, Publication date: February 2020.
+DOI: https://doi.org/10.1145/3365199 (https://doi.org/10.1145/3365199)
+The common perception in both academic literature and industry today is that virtual machines offer better security, whereas containers offer
+better performance. However, a detailed review of the history of these technologies and the current threats they face reveals a different story.
+This survey covers key developments in the evolution of virtual machines and containers from the 1950s to today, with an emphasis on
+countering modern misperceptions with accurate historical details and providing a solid foundation for ongoing research into the future of
+secure isolation for multitenant infrastructures, such as cloud and container deployments.
+CCS Concepts: • Software and its engineering → Distributed systems organizing principles; • Security and privacy → Operating systems security;
+• General and reference → Surveys and overviews;
+Additional Key Words and Phrases: Containers, virtual machines, virtualization
+ACM Reference format:
+Allison Randal. 2020. The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers. ACM Comput. Surv. 53, 1, Article 5 (February 2020), 31
+pages. https://doi.org/10.1145/3365199 (https://doi.org/10.1145/3365199)
+1 INTRODUCTION
+Many modern computing workloads run in multitenant environments, where each physical machine is split into
+hundreds or thousands of smaller units of computing, generically called guests. Cloud and containers are currently
+the leading approaches to implementing multitenant environments. The guests in a cloud deployment are
+commonly called virtual machines or cloud instances, whereas the guests in a container deployment are
+commonly called containers. Typically, a single tenant (a user or group of users) is granted access to deploy guests
+in an orchestrated fashion across a cloud or cluster made up of hundreds or thousands of physical machines
+located in the same data center or across multiple data centers, to facilitate operational flexibility in areas such as
+capacity planning, resiliency, and reliable performance under variable load. Each guest runs its own (often
+minimal) operating system and application workloads, and maintains the illusion of being a physical machine,
+(http://www.acm.org)
+(http://www.acm.org)
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 2 of 45
+both to the end users who interact with the services running in the guests, and to developers who are able to build
+those services using familiar abstractions, such as programming languages, libraries, and operating system
+features. The illusion, however, is not perfect, because ultimately the guests do share the hardware resources
+(CPU, memory, cache, devices) of the underlying physical host machine, and consequently also have greater access
+to the host's privileged software (kernel, operating system) than a physically distinct machine would have.
+Ideally, multitenant environments would offer strong isolation of the guest from the host, and between guests on
+the same host, but reality falls short of the ideal. The approaches that various implementations have taken to
+isolating guests have different strengths and weaknesses. For example, containers share a kernel with the host,
+whereas virtual machines may run as a process in the host operating system or a module in the host kernel, so they
+expose different attack surfaces through different code paths in the host operating system. Fundamentally,
+however, all existing implementations of virtual machines and containers are leaky abstractions, exposing more of
+the underlying software and hardware than is necessary, useful, or desirable. New security research in 2018
+delivered a further blow to the ideal of isolation in multitenant environments, demonstrating that certain
+hardware vulnerabilities related to speculative execution—including Spectre, Meltdown, Foreshadow, L1TF, and
+variants—can easily bypass the software isolation of guests.
+Because multitenancy has proven to be useful and profitable for a large sector of the computing industry, it is
+likely that a significant percentage of computing workloads will continue to run in multitenant environments for
+the foreseeable future. This is not a matter of naïveté but of pragmatism: these days, the companies who provide
+and make use of multitenant environments are generally fully aware of the security risks, but they do so anyway
+because the benefits—such as flexibility, resiliency, reliability, performance, cost, or any of a dozen other factors—
+outweigh the risks for their particular use cases and business needs. That being the case, it is worthwhile to take a
+step back and examine how the past 60 years of evolution led to the current tension between secure ideals and
+flawed reality, and what lessons from the past might help us build more secure software and hardware for the next
+60 years.
+This survey is divided into sections following the evolutionary paths of the technologies behind virtual machines
+and containers, generally in chronological order, as illustrated in Figure 1. Section 3 explores the common origins
+of virtual machines and containers in the late 1950s and early 1960s, driven by the architectural shift toward
+multitasking and multiprocessing, and motivated by a desire to securely isolate processes, efficiently utilize shared
+resources, improve portability, and minimize complexity. Section 4 examines the first virtual machines in the mid1960s to 1970s, which primarily aimed to improve resource utilization in time-sharing systems. Section 5 delves
+into the capability systems of the early 1960s to 1970s—the precursors of modern containers—which evolved along
+a parallel track to virtual machines, with similar motivations but different implementations. Section 6 outlines the
+resurgence of virtual machines in the late 1990s and 2000s. Section 7 traces the emergence of containers in the
+2000s and 2010s. Section 8 investigates the impact of recent security research on both virtual machines and
+containers. Section 9 briefly looks at the relationship between virtual machines and containers and the related
+terms cloud, serverless, and unikernels.
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 3 of 45
+2 TERMINOLOGY
+For the sake of clarity, this survey consistently uses certain modern or common terms, even when discussing
+literature that used various other terms for the same concepts:
+Fig. 1. The evolution of virtual machines and containers.
+• Container: The term container does not have a single origin, but some early relevant examples of use are
+Banga et al. [25] in 1999, Lottiaux and Morin [127] in 2001, Morin et al. [145] in 2002, and Price and
+Tucker [164] in 2004. Early literature on containers confusingly referred to them as a kind of virtualization
+[45, 48, 104, 142, 164, 182], or even called them virtual machines [182]. As containers grew more
+popular, the confusion shifted to virtual machines being called containers [37, 220]. This survey uses the
+term container for multitenant deployment techniques involving process isolation on a shared kernel (in
+contrast with virtual machine, as defined in the following). However, in practice, the distinction between
+containers and virtual machines is more of a spectrum than a binary divide. Techniques common to one can
+be effectively applied to the other, such as using system call filtering with containers, or using seccomp
+sandboxing or user namespaces with virtual machines.
+• Complexity: There are many dimensions to complexity in computing, but in the context of multitenant
+infrastructures, some uniquely relevant dimensions are keeping each guest, the interactions between guests,
+and the host's management of the guests as small and simple as possible. The implementation technique of
+isolation supports minimizing complexity by restricting access to internal knowledge of the guests and host,
+and providing well-defined interfaces to reduce the complexity of interactions between them.
+• Guest: The term guest had some early usage in the 1980s for the operating system image running inside a
+virtual machine [147] but was not common until the early 2000s [26, 197]. This survey uses guest as a
+general term for operating system images hosted on multitenant infrastructures but occasionally
+distinguishes between virtual machine guests and container guests.
+• Kernel: A variety of different terms appear in the early literature, including supervisory program [52],
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 4 of 45
+supervisor program [20], control program [15, 149, 153], coordinating program [153], nucleus [1, 43],
+monitor [209], and ultimately kernel around the mid-1970s [123, 161]. This survey uses the modern term
+kernel.
+• Performance: There are many dimensions to performance in computing, but in the context of multitenant
+infrastructures, some uniquely relevant dimensions are the performance impact of added layers of
+abstraction separating the guest application workload from the host, balanced against the performance
+benefits of sharing resources between guests and reducing wasted resources from unused capacity. At the
+level of a single machine, this involves running multiple guests on the same machine at the same time, with
+potential for intelligent, dynamic scheduling to extract more work from the same resource pool. Across
+multiple machines, this involves a larger pool of shared resources, more flexibility to balance work, and
+options for heterogenous hardware with resource-affinity configurations (e.g., a mixture of some CPU-heavy
+machines and some storage-heavy machines, with workload allocation determined by resource needs). The
+implementation technique of breaking down machines into smaller guests and their resources into smaller,
+sharable units, supports performance by allowing finer-grained and distributed control over resource
+management.
+• Portability: There are many dimensions to portability in computing, but in the context of multitenant
+infrastructures, some uniquely relevant dimensions are developing guests in a standardized way—without
+any special knowledge of the environment where they will be deployed—and abstracting deployment and
+management across physical machines, limiting dependence on low-level hardware details. For example, a
+container guest can be deployed anywhere in the cluster, or a virtual machine guest can be deployed on any
+compute machine in the cloud. The implementation techniques of standardizing interfaces so guests are
+substitutable and hiding implementation and hardware details behind well-defined interfaces both support
+portability.
+• Process: The early literature tended to use the terms job [171] or program [20, 52, 153], and process only
+appeared around the mid-1960s [14, 65]. This survey uses the modern term process. The early use of
+multiprogramming meaning “multiprocessing” was derived from the early use of program meaning
+“process.”
+• Security: There are many dimensions to security in computing, but in the context of multitenant
+infrastructures, some uniquely relevant dimensions are limiting access between guests, from guests to the
+host, and from the host to the guests. The implementation technique of isolation supports security, at both
+the software level and the hardware level, by reducing the likelihood of a breach and limiting the scope of
+damage when a breach occurs.
+• Virtual machine: This survey uses the term virtual machine for multitenant deployment techniques
+involving the replication/emulation of real hardware architectures in software (in contrast with container,
+as defined earlier). The code responsible for managing virtual machine guests on a physical host machine is
+often called a hypervisor or virtual machine monitor, both derived from two early terms for the kernel,
+supervisor and monitor. In many early implementations of virtual machines, the host kernel managed both
+guests and ordinary processes.
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 5 of 45
+3 COMMON ORIGINS
+The origins of both virtual machines and containers can be traced to a fundamental shift in hardware and software
+architectures toward the late 1950s. The hardware of the time introduced the concept of multiprogramming,
+which included both basic multitasking in the form of simple context-switching and basic multiprocessing in the
+form of dedicated I/O processors and multiple CPUs. Codd [51] attributed the earliest known use of the term
+multiprogramming to Rochester [171] in 1955, describing the ability of an IBM 705 system to interrupt an I/O
+process (tape read), run a process (calculation) on the data found, and then return to the I/O process. The concept
+of multiprogramming evolved over the remainder of the decade through work on the EDSAC [211], UNIVAC
+LARC [70], STRETCH (IBM 7030) [52, 69], TX-2 [77], and an influential and comprehensive review by Gill [82].
+Key trade-offs discussed in the literature on multiprogramming—around security, performance, portability, and
+complexity—continue to echo through modern literature on virtual machines and containers.
+3.1 Security
+Multiprogramming increased the complexity of the system software—due to simultaneous and interleaved
+processes interacting with other processes and shared hardware resources—and also increased the consequences
+of misbehaving system software—since any process had the potential to disrupt any other process on the same
+machine. Codd et al. [52] discussed secure isolation as a requirement for “noninterference” between processes
+regarding errors, in the core design principles for STRETCH. Codd [51] later expanded on the requirement as a
+need to prevent processes from making “accidental or fraudulent” changes to another process. Buzen and
+Gagliardi [43] called out the risk of one process modifying memory allocated to other processes or privileged
+system operations.
+In response to the increase in complexity and risk, system software of the time introduced a familiar form of
+isolation, granting a small privileged kernel of system software unrestricted access to all hardware resources and
+running processes, as well as responsibility for potentially disruptive operations such as memory and storage
+allocation, process scheduling, and interrupt handling while restricting access to such features from any software
+outside the kernel. Codd et al. [52] described the structure and function of the STRETCH kernel in detail,
+including concurrency, interrupts, memory protection, and time limits (an early form of resource usage control).
+Amdahl et al. [20] touched on the separation of the kernel in the IBM System/360, including appendices of
+relevant opcodes and protected storage locations. Opler and Baird [153] weighed trade-offs around having the
+kernel take responsibility for coordinating the parallel operation of processes and judged the approach to have
+potential to improve portability of programs not written for parallel operation, as well as potential to minimize
+complexity for programmers who would no longer be responsible to manually coordinate the parallel operation of
+each program.
+3.2 Performance
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 6 of 45
+One of the fundamental goals of adding multiprogramming to hardware and operating systems in the late 1950s
+was to improve performance through more efficient utilization of available resources by sharing them across
+parallel processes. Codd et al. [52] described performance as a requirement for “noninterference” between
+processes regarding “undue delay.” Opler and Baird [153] explored the trade-offs between the performance
+advantages of increasing utilization through multiprocessing, versus the increased complexity of developing for
+such systems. Codd [49, 50] published two further papers in 1960 about performance considerations for process
+scheduling algorithms in multiprogramming. Amdahl et al. [20, p. 89] explored the trade-offs between
+performance and portability in the architecture design of the IBM System/360. Dennis [64, p. 590] noted the
+performance advantages of dynamic memory allocation for multiprogramming.
+3.3 Portability
+In the 1950s, it was common for specialized system software to be developed for each new model of hardware,
+requiring programs to be rewritten to run on even closely related machines. As the system software and programs
+grew larger and more complex, the porting effort grew more costly, motivating a desire for programs to be
+portable across different machines. Codd et al. [52] discussed portability as a requirement for “independence of
+preparation” and “flexible allocation of space and time.” Amdahl et al. [20, p. 97] emphasized portability as one of
+the primary design goals of the IBM System/360, specifically allowing machine-language programs to run
+unmodified across six different hardware models, with a variety of different configurations of peripheral devices.
+Buzen and Gagliardi [43] noted that the introduction of a privileged kernel compounded the problem of
+portability, since a program might have to be rewritten to run on two different kernels, even when the underlying
+hardware was compatible or completely identical.
+3.4 Minimizing Complexity
+Another early realization after the introduction of multiprogramming was that it was unreasonable to expect the
+developer of each process to directly manage all of the complexity of interacting with every other process running
+on the machine, so the privileged kernel approach had the advantage of allowing processes to maintain a more
+minimal focus on their own internals. Codd et al. [52] described minimizing complexity as a requirement for
+“minimum information from programmer.” Nearly a decade before Rushby [173] first wrote about the idea of a
+Trusted Computing Base, Buzen and Gagliardi [43, p. 291] argued for minimizing complexity within the privileged
+kernel, noting that such separation was effective when the privileged code base was kept small, so it could be
+maintained in a relatively stable state, with limited changes over time, by a few expert developers.
+4 EARLY VIRTUAL MACHINES
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 7 of 45
+The early work on virtual machines grew directly out of the work on multiprogramming, continuing the goal of
+safely sharing the resources of a physical machine across multiple processes. Initially, the idea was no more than a
+refinement on memory protection between processes, but it expanded into a much bigger idea: that small isolated
+bundles of shared resources from the host machine could present the illusion of being a physical machine running
+a full operating system.
+4.1 M44/44X
+In 1964, Nelson [149] published an internal research report at IBM outlining plans for an experimental machine
+based on the IBM 7044, called the M44. The project built on earlier work in multiprogramming, improving
+process isolation and scheduling in the privileged kernel with an early form of virtual memory. They called the
+memory mapped for a particular process a virtual machine [149, p. 14]. The 44X part of the name stood for the
+virtual machines (also based on the IBM 7044) running on top of the M44 host machine.
+Nelson [149, pp. 4–6] identified the performance advantages of dynamically allocated shared resources
+(especially memory and CPU) as one of the primary motivators for the M44/44X experiments. Portability was
+another central consideration, allowing software to run unmodified across single process, multiprocess, and
+debugging contexts [149, pp. 9–10].
+The M44/44X lacked almost all of the features we would associate with virtual machines today, but it played an
+important, although largely forgotten, part in the history of virtual machines. Denning [63] reflected that the
+M44/44X was central to significant theoretical and experimental advances in memory research around paging,
+segmentation, and virtual memory in the 1960s.
+4.2 Cambridge Monitor System
+The IBM System/360 was explicitly designed for portability of software across different models and different
+hardware configurations [20]. In the mid-1960s, IBM's Control Program-40 Cambridge Monitor System (CP40/CMS) project running on a modified IBM System/360 (model 40) took the idea a few steps further—initially
+calling the work a pseudo machine but later adopting the term virtual machine [61, p. 485]. The CP-40/CMS and
+later CP-67/CMS projects improved on earlier approaches to portability, making it possible for software written
+for a bare metal machine to run unmodified in a virtual machine, which could simulate the appearance of various
+different hardware configurations [15, pp. 1–2]. It also improved isolation by introducing privilege separation for
+interrupts [15, pp. 6–7], paged memory within virtual machine guests [43, 155], and simulated devices [1, 43].
+IBM's work on the CP-40/CMS focused on improving performance through efficient utilization of shared memory
+[15, pp. 3–5] and explictly did not target efficient utilization of CPU through sharing [15, p. 1]. Kogut [112]
+developed a variant of CP-67/CMS to improve performance through dynamic allocation of storage (physical disk)
+to virtual machines.
+1
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 8 of 45
+4.3 VM/370
+IBM's VM/370 running on the System/370 hardware followed in the early 1970s and included virtual memory
+hardware [61, p. 485]. Madnick and Donovan [130, p. 214] estimated the overhead of the VM/370 at 10% to 15%
+but deemed the performance trade-off to be worthwhile from a security perspective. Goldberg [85, pp. 39–40]
+identified the source of overhead as primarily: maintaining state for virtual processors, trapping and emulating
+privileged instructions, and memory address translation for virtual machine guests (especially when paging was
+supported in the guests). In retrospect, Creasy [61] noted that efficient execution was never a primary goal of
+IBM's work on the CP-40, CP-67, or VM/370 (p. 487), and the focus was instead on efficient utilization of available
+resources (p. 484).
+4.4 Trade-Offs
+In their formal requirements for virtual machines in the mid-1970s, Popek and Goldberg [162, p. 413] stated that
+ideally virtual machines should “show at worst only minor decreases in speed” compared to running on bare
+metal. In 2017, Bugnion et al. [41] explained Popek and Goldberg's requirements in modern terms, exploring the
+performance impact for hardware architectures that do not fully meet the requirements.
+Buzen and Gagliardi [43, p. 291], Madnick and Donovan [130, p. 212], Goldberg [84, p. 75], and Creasy [61, p.
+486] all observed that the portability offered by virtual machines was also an advantage for development purposes,
+since it allowed development and testing of multiple different versions of the kernel/operating systems—and
+programs targeting those kernels/operating systems—in multiple different virtual hardware configurations, on the
+same physical machine at the same time.
+Buzen and Gagliardi [43] considered one of the key advantages of the virtual machine approach to be that “virtual
+machine monitors typically do not require a large amount of code or a high degree of logical complexity.” Popek
+and Kline [161, p. 294] discussed the advantage of virtual machines being smaller and less complex than a kernel
+and complete operating system, improving their potential to be secure. Goldberg [85, p. 39] suggested minimizing
+complexity as a way to improve performance: selectively disabling more expensive features (e.g., memory paging
+in guests) for virtual machines that would not use the features. Creasy [61, p. 488] discussed the advantages of
+minimizing interdependencies between virtual machines, giving preference to standard interfaces on the host
+machine.
+A frequently cited group of papers in the early 1970s, by Lauer and Snow [118], Lauer and Wyeth [119], and
+Srodawa and Bates [185], suggested that virtual machines offered a sufficient level of isolation that it was no
+longer necessary to maintain a privilege-separated kernel in the host operating system. However, by that point in
+time, the concept of a privileged kernel was well enough established that the idea of eliminating it was unlikely to
+be widely accepted. Buzen and Gagliardi [43, p. 297] observed that the proposal depended heavily on the ability of
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 9 of 45
+the virtual machine implementation to handle all virtual memory mapping directly, but since the papers failed to
+take memory segmentation into account, the approach could not be implemented as initially proposed.
+4.5 Decline
+As companies like DEC, Honeywell, HP, Intel, and Xerox introduced smaller hardware to the market in the 1970s,
+they did not include hardware support for features such as virtual memory and the ability to trap all sensitive
+instructions, which made it challenging to implement strong isolation using virtual machine techniques on such
+hardware [66, 78]. Creasy [61, p. 484] observed in the early 1980s that the advent of the personal computer
+decreased interest in the early forms of virtual machines—which were largely developed for the purpose of
+isolating users in time-sharing systems on mainframes—but he recognized potential for virtual machines to serve
+“the future's network of personal computers.”
+5 EARLY CAPABILITIES
+The origin of containers is often attributed [31, 54, 114, 121, 166] to the addition of the chroot system call in the
+seventh edition of UNIX released by Bell Labs in 1979 [108]. The simple form of filesystem namespace isolation
+that chroot provides was certainly one influence on the development of containers, although it lacked any
+concept of isolation for process namespaces [105, 165]. However, containers are not a single technology; they are
+a collection of technologies combined to provide secure isolation, including namespaces, cgroups, seccomp, and
+capabilities. Combe et al. [54], Jian and Chen [102], Kovács [114], Priedhorsky and Randles [165], and Raho et
+al. [166] describe how these different technologies combine to provide secure isolation for containers. It is more
+accurate to attribute the origin of containers to the earliest of these technologies—capabilities—that began decades
+before chroot and several years before the first work on virtual machines. Like containers, capabilities took the
+approach of building secure isolation into the hardware and the operating system, without virtualization.
+5.1 Descriptors
+In the early 1960s, inspired by the need to isolate processes, the Burroughs B5000 hardware architecture
+introduced an improvement to memory protection called descriptors, which flagged whether a particular memory
+segment held code or data, and protected the system by ensuring it could only execute code (and not data), and
+could only access data appropriately (a single element scalar, or bounds-checked array) [120, 136]. A process on
+the B5000 could only access its own code and data segments through a private Program Reference Table, which
+held the descriptors for the process [120, p. 23]. A descriptor also flagged whether a segment was actively in main
+memory or needed to be loaded from drum [120, p. 24].
+2
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 10 of 45
+5.2 Dennis and Van Horn
+In the mid-1960s, Dennis and Van Horn [65] introduced the term capability in theoretical work directly inspired
+by both the Burroughs B5000 and MIT's Compatible Time-Sharing System (CTSS) [65, p. 154]. Like the B5000
+descriptors, capabilities defined the set of memory segments a process was permitted to read, write, or execute
+[120, p. 42]. These early capabilities introduced several important refinements: a process executed within a
+protected domain with an associated capability list; multiple processes could share the same capability list; and a
+process could FORK a parallel process with the same capabilities (but no greater), or create a subprocess with a
+subset of its own capabilities (but no greater) [120, pp. 42–44]. These theoretical capabilities also had a concept of
+ownership (by a process or a user) [120, p. 42] and of persistent data “directories” (but not files) that survived
+beyond the execution of a process and could be private to a user or accessible to any user [120, pp. 44–45].
+Soon after Dennis and Van Horn published their theoretical capabilities, Ackerman and Plummer [14]
+implemented some aspects of capabilities relating to resource control on a modified PDP-1 at MIT and added a file
+capability in addition to the directory capability—a precursor to filesystem namespaces.
+5.3 Chicago Magic Number Machine
+In 1967, the University of Chicago launched the first attempt at designing and building a general-purpose
+hardware and software capability system, which they later called the Chicago Magic Number Machine [73, 74].
+The Chicago machine pushed the concept of separation between capabilities and data further, to protect against
+users altering the capabilities that limited their access to memory on the system [120, pp. 49–50]. The machine
+had a set of physical registers for capabilities, which were distinct from the usual set of registers for data. It also
+flagged whether each memory segment stored capabilities or data, and prevented processes from performing data
+operations like reading or writing on capability segments or capability registers. Inter-process communication also
+sent both a capability segment and a data segment [120, p. 51].
+The University of Chicago project ran out of funding and was never completed, but it inspired subsequent work on
+CAL-TSS [120, p. 49].
+5.4 CAL-TSS
+In 1968, the University of California at Berkeley launched the CAL-TSS project [120, pp. 52–57], which aimed to
+produce a general-purpose capability-based operating system, to run on a Control Data Corporation 6400 model
+(RISC architecture) mainframe machine, without any special customization to the hardware. Like previous
+implementations, CAL-TSS confined a process to a domain, restricting access to hardware registers, memory,
+executable code, system calls to the kernel, and inter-process communication. The project introduced a concept of
+3
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 11 of 45
+unique and non-reusable identifiers for objects, to protect against reuse of dangling pointers to access and modify
+memory that has been reallocated after being freed.
+The CAL-TSS project encountered difficulties implementing the operating system as designed and was terminated
+in 1971. Levy [120, p. 57] identified the memory management features of the CDC 6400 as a particularly
+troublesome obstacle to the implementation. In postmortem analysis, Sturgis [186] and Lampson and Sturgis
+[116] reflected that CAL-TSS ended up being large, overly complex, and slow, and attributed this primarily to a
+poor match between the hardware they selected and the design of mapped address spaces, and also to their design
+choice of distributing privileged code for manipulating global system data across individual processes rather than
+consolidating it in a privileged kernel.
+5.5 Plessey System 250
+In the early 1970s, the Plessey System 250 [72] was a commercially successful real-time multiprocessing
+telephone-switch controller. It implemented capabilities for memory protection and process isolation [120, p. 65],
+and expanded capabilities into the I/O system [120, p. 77].
+5.6 Provably Secure Operating System
+Also in the early 1970s, the Stanford Research Institute began a project to explore the potential of formal proofs
+applied to a capability-based operating system design, which they called the Provably Secure Operating System
+(PSOS) [150]. The design was completed in 1980 but never fully formally proven and never implemented [151].
+5.7 CAP
+In the late 1970s, the University of Cambridge's CAP machine [148, 210] successfully implemented capabilities as
+general-purpose hardware combined with a complementary operating system. The CAP introduced a refinement
+replacing the privileged kernel with an ordinary process, so the special control the “root” process had over the
+entire system was really just the normal ability of any process to create subprocesses and grant a subset of its own
+capabilities to those subprocesses [120, pp. 80–81].
+5.8 Object Systems
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 12 of 45
+Several software offshoots of the early capability systems generalized the idea by treating processes and shared
+resources as typed objects with associated capabilities, including Carnegie-Mellon's Hydra [217, 218], StarOS
+[103], and Gnosis later renamed as KeyKOS [92].
+5.9 IBM System/38
+In 1978, IBM announced plans for a capability-based hardware architecture, the System/38, which they shipped in
+1980 [120, p. 137]. Berstis [32] characterized the primary goal of the System/38 as improving memory protection
+without sacrificing performance. Houdek et al. [96] described the implementation of capabilities as protected
+pointers in detail. The System/38 introduced a concept of user profiles associated with protected process domains
+[32, pp. 249–250], which were vaguely reminiscent of modern user namespaces, although implemented
+differently. User profiles allowed for revocation of capabilities but at the cost of significantly increased complexity
+in the implementation [120, pp. 155–156].
+The System/38 was succeeded by the AS/400 in the late 1980s, which removed capability-based addressing [183,
+p. 119]. The AS/400 later adopted the concept of logical partitioning from the IBM System/370 [176, pp. 1–2], to
+divide the physical resources of the host machine between multiple guests at the hardware level [183, pp. 240,
+328].
+5.10 Intel iAPX 432
+In 1975, Intel began designing the iAPX 432 [2] capability-based hardware architecture, which they originally
+intended to be their next-generation, market-leading CPU, replacing the 8080 [137, p. 79]. The project finally
+shipped in 1981, but it was significantly delayed and significantly over budget [137, p. 79].
+Mazor [137, p. 75] recorded that performance was not considered as a goal in the design of the iAPX 432. Hansen
+et al. [91] measured the performance of the iAPX 432 against the Intel 8086, Motorola 68000, and the VAX11/780 in 1982, with results as poor as 95 times slower on some benchmarks. Norton [152, p. 27] assessed the
+poor performance and unoptimized compiler offered by the iAPX 432 as the leading cause of its commercial
+failure. Levy [120, p. 186] blamed the commercial failure on both poor performance and overhyped marketing.
+In a move that Mazor [137] described as “a crash program . . . to save Intel's market share” (p. 75), Intel launched
+a parallel project to develop the 8086 architecture (the first in a long line of x86 CPUs), which became Intel's
+leading product line by default rather than by design (p. 79).
+5.11 Trade-Offs
+4
+5
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 13 of 45
+The early capability systems in the 1960s and 1970s sacrificed performance for the sake of security, although Levy
+speculated in the mid-1980s that this was partly due to “hardware poorly matched to the task” [120, p. 205].
+Wilkes [209, pp. 49–59] contrasted the memory protection features of capabilities with other systems of the time,
+including detailed descriptions of hardware implementations.
+Levy [120, p. 205] also observed that the early capability systems significantly increased complexity for the sake of
+security. Patterson and Séquin [157] and Patterson and Ditzel [156] judged this sacrifice as a major reason the
+capability machines were surpassed by simpler architectures, such as RISC.
+Kirk McKusick recalled that the primary reason Bill Joy ported chroot from UNIX into BSD in 1982 was for
+portability, so he could build different versions of the system in an isolated build directory [105, p. 11].
+5.12 Decline
+As with virtual machines, interest in the early capability systems sharply declined in the 1980s, influenced by
+several independent factors. Several early attempts to implement capabilities were terminated uncompleted—
+notably the Chicago Magic Number Machine, CAL-TSS, and the PSOS—contributing to a reputation that capability
+systems were difficult to implement and perhaps overly ambitious, despite the successful implementations that
+followed. The commercial failure of Intel's iAPX 432 raised further doubts on the feasibility of capability-based
+architectures. In 2003, Neumann and Feiertag [151, p. 6] looked back on the early capability systems, expressing
+disappointment that “the demand for meaningfully secure systems has remained surprisingly small until recently.”
+Perhaps the most significant factor in the decline of capabilities was the rise of the general-purpose operating
+system, which was a third important technology that evolved from multiprogramming. MIT's CTSS [55, 209] laid
+the foundation for Multics [56], which later inspired UNIX [168] and its robust mutation, the Berkeley Software
+Distribution (BSD) [138, 139]. Saltzer and Schroeder [174, p. 1294] contrasted capabilities with the access
+control list models adopted by Multics and its descendants, calling out revocation of access as one major area
+where capabilities fell short.
+Although none of the early capability systems remain in use today, they have not been entirely forgotten. In 2003,
+Miller et al. [143] reviewed capability systems from a historical perspective, addressing common misconceptions
+about capabilities related to revocation, confinement, and equivalence to access control lists. Section 7 traces the
+evolution of a feature called capabilities in the modern Linux Kernel. FreeBSD took a different approach for the
+feature it calls capabilities and integrated the Capsicum framework [140, p. 30], which was more directly derived
+from the classic capability systems [21, 199]. In 2012, the CHERI project [200, 202, 203, 215] expanded on the
+ideas of the Capsicum framework, pushing its capability model down into an RISC-based hardware architecture.
+Since 2016, Google has been exploring a revival of capability systems with the Fuchsia operating system and
+Zircon microkernel [87]. In a 2018 plenary session about Spectre/Meltdown, Hennessy [94] pointed to future
+potential for capabilities, reflecting that the early capability systems “probably weren't the right match for what
+6
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 14 of 45
+software designers thought they needed and they were too inefficient at the time” but suggested “those are all
+things we know how to fix now . . . so it's time, I think, to begin re-examining some of those more sophisticated
+[protection] mechanisms and see if they'll work.”
+6 MODERN VIRTUAL MACHINES
+Virtual machines still existed in the 1980s and 1990s but garnered only a bare minimum of activity and interest.
+IBM's line of VM products, descended from VM/370, continued to have a small but loyal following [194]. DOS,
+OS/2, and Windows all offered a limited form of DOS virtual machines during that time, although it might be
+more fair to categorize those as emulation. The rise of programming languages like Smalltalk and Java repurposing the term virtual machine—to refer to an abstraction layer of a language runtime rather than a software
+replication of a real hardware architecture—may be indicative of how dead the original concept of virtual machines
+was in that period.
+After nearly two decades, the late 1990s brought a resurgence of interest in virtual machines but for a new purpose
+adapted to the technology of the time.
+6.1 Disco
+In 1997, the Disco research project at Stanford University explored reviving virtual machines as an approach to
+making efficient use of hardware with multiple CPUs (on the order of “tens to hundreds”), and included a
+lightweight library operating system for guests (SPLASHOS) as an option, in addition to supporting commodity
+operating systems as guests. Bugnion et al. [39] cited portability (rather than security or performance) as the
+primary motivation of the Disco project, which proposed virtual machines as a potential way to allow commodity
+operating systems (Unix, Windows NT, and Linux) to run on NUMA architectures without extensive
+modifications.
+6.2 VMware
+A year later, the team behind Disco founded VMware to continue their work, and released a workstation product
+in 1999 [40], quickly followed by two server products (GSX and ESX) in 2001 [18, 175, 197]. VMware faced a
+challenge in virtualizing the x86 architectures of the time, because the hardware did not support traditional
+virtualization techniques—specifically the architecture contained some sensitive instructions that were not also
+privileged—so a virtual machine monitor could not rely on trapping protection exceptions as the sole means of
+identifying when to execute emulated instructions as a safe replacement, since some potentially harmful
+instructions would never be trapped [170, p. 131]. To work around this limitation, VMware combined the trap- 7
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 15 of 45
+and-execute technique with a dynamic binary translation technique [40, p. 12:3], which was faster than full
+emulation but still allowed the guest operating system to run unmodified [40, pp.12:29–12:36].
+6.3 Denali
+The Denali project at the University of Washington in 2002 [207] introduced the term paravirtualization,
+another work-around for the lack of hardware virtualization support in x86, which involved altering the
+instruction set in the virtualized hardware architecture and then porting the guest operating system to run on the
+altered instruction set [206].
+6.4 Xen
+The Xen project at the University of Cambridge in 2003 [26] also used paravirtualization techniques and modified
+guest operating systems but emphasized the importance of preserving the application binary interface (ABI)
+within the guests so that guest applications could run unmodified. Xen's greatest technical contribution may have
+been its approach to precise accounting for resource usage, with the explicit intention to individually bill tenants
+sharing physical machines [26, p. 176], which was a relatively radical idea at the time and directly led to the
+creation of Amazon's Elastic Compute Cloud (EC2) a couple of years later [28].
+Chisnall [47] provided a detailed account of Xen's architecture and design goals. Xen's approach to the problem of
+untrapped x86 privileged instructions was to substitute a set of hypercalls for unsafe system calls [47, pp. 10–13].
+Smith and Nair [181, p. 422] highlighted that Xen was able to run unmodified application binaries within the
+guest, because it ran the guest in ring 1 of the IA-32 privilege levels and the hypervisor in ring 0, so all privileged
+instructions were filtered through the hypervisor.
+6.5 x86 Hardware Virtualization Extensions
+In 2000, Robin and Irvine [170] analyzed the limitations of the x86 architecture as a host for virtual machine
+implementations, with reference to the earlier work of Goldberg [83] on the architectural features required to
+support virtual machines. In the mid-2000s, in response to the growing success of virtual machines, and the
+challenges of implementing them on x86 hardware, Intel and AMD both added hardware support for
+virtualization in the form of a less privileged execution mode to execute code for the virtual machine guest directly
+but selectively trap sensitive instructions, eliminating the need for binary translation or paravirtualization.
+Rosenblum and Garfinkel [172] discussed the motivations behind the added hardware support for virtualization in
+x86, before the changes were released. Pearce et al. [158, p. 7] contrasted binary translation, paravirtualization,
+and the features x86 added for hardware-assisted virtualization, clarifying the x86 virtualization extensions were
+not full virtualization. Adams and Agesen [16] recounted the difficulties VMware encountered while integrating
+8
+9
+10
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 16 of 45
+the x86 hardware virtualization extensions and concluded that the new features offered no performance advantage
+over binary translation.
+In 2007, the KVM subsystem for the Linux Kernel provided an API for accessing the x86 hardware virtualization
+extensions [110]. Since KVM was only a Kernel subsystem, the developers released a fork of QEMU as the
+userspace counterpart of KVM, so the combination of QEMU+KVM provided a full virtual machine
+implementation, including virtual devices [198, pp.128–129]. Eventually, KVM support was merged into mainline
+QEMU [122].
+6.6 Hyper-V
+In 2008, Microsoft released a beta of Hyper-V [107] for Windows Server. It was built on top of the x86 hardware
+virtualization extensions and for some virtual devices offered a choice between slower emulation and faster
+paravirtualization if the guest operating system installed the “Enlightened I/O” extensions. Like Xen's Dom0,
+Hyper-V granted special privileges to one guest, called the parent partition, which hosted the virtual devices and
+handled requests from the other guests.
+In 2010, Bolte et al. [35] incorporated support for Hyper-V into libvirt, so it could be managed through a
+standardized interface, together with Xen, QEMU+KVM, and VMware ESX.
+6.7 Trade-Offs
+Denali and Xen both used paravirtualization techniques, sacrificing portability to gain performance, but their
+goals for scale were completely different: Denali considered 10,000 virtual machines to be a good result [208]—
+achieved through a combination of lightweight guests and a minimal host—whereas Xen argued that 100 virtual
+machines running full operating systems was a more reasonable target [26, p. 165,175]. To some extent, Denali
+was more in line with modern container implementations than with the virtual machine implementations of its
+day. Xen has shifted their estimation of required scale upward over the years but still exhibits a tolerance for
+unnecessary performance degradation. For example, Manco et al. [131] demonstrated that a few small internal
+changes to the way Xen stores metadata and creates virtual devices improved virtual machine instantiation time
+by an order of magnitude—a result 50 to 200 times faster than Docker's container instantiation—however, those
+patches are unlikely to ever make it into mainline Xen.
+Xen and KVM have a reputation for sacrificing performance to gain security; however, several independent lines of
+research have raised questions as to whether those security gains are real or imagined. Perez-Botero et al. [159]
+analyzed security vulnerabilities in Xen and KVM between 2008 and 2012, categorizing them by source, vector,
+and target, and observed that the most common vector of attack was device emulation (Xen 34%, KVM 40%), the
+majority were triggered from within the virtual machine guest (Xen 71%, KVM 66%), and the majority successfully
+11
+12
+13
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 17 of 45
+targeted the hypervisor's Ring –1 privileges or slightly less privileged control over Dom0 or the host operating
+system (Xen 80%, KVM 76%). Chandramouli et al. [46] built on the work of Perez-Botero et al. [159], moving
+toward a more general framework for forensic analysis of vulnerabilities in virtual machine implementations.
+Ishiguro and Kono [101] evaluated vulnerabilities in Xen and KVM related to instruction emulation between 2009
+and 2017. They demonstrated that a prototype “instruction firewall” on KVM—which denies emulation of all
+instructions except the small subset deemed legitimate in the current execution context—could have defended
+against the known instruction emulation vulnerabilities; however, the patches are unlikely to ever make it into
+mainline KVM.
+Szefer et al. [191] demonstrated in the NoHype implementation (based on Xen) that eliminating the hypervisor
+and running virtual machines with more direct access to the hardware improved security by reducing the attack
+surface and removing virtual machine exit events as potential attack vectors. However, the approach involved a
+performance trade-off in resource utilization that was not viable for most real deployments: it pre-allocated
+processor cores, memory, and I/O devices dedicated to specific virtual machines rather than allowing for
+oversubscription and dynamic allocation in response to load.
+One persistent argument in favor of virtual machines has been that virtual machine implementations have fewer
+lines of code than a kernel or host operating system, and are therefore easier to code review and secure [39, 81,
+131, 158, 178], which is the classic trade-off of minimizing complexity to gain security. However, less code offers
+only a vague potential for security, and even that potential becomes questionable as modern virtual machine
+implementations have grown larger and more complex [37, 53, 158, 214].
+Recent work on virtual machines—such as ukvm [212], LightVM [131], and Kata Containers (formerly Intel Clear
+Containers) [5]—has shifted back toward an emphasis on improving performance. However, this work appears to
+be founded on the assumption that the virtual machine implementations under discussion are adequately secure
+and need only improve performance, which is a dubious assumption at best.
+Two notable departures from this complacent attitude to security are Google's crosvm [86] and Amazon's
+Firecracker [19], which aim to improve both performance and security, by replacing QEMU with a radically
+smaller and simpler userspace component for KVM, and by choosing Rust as the implementation language for
+memory safety. Firecracker started as a fork of crosvm, but the two projects are collaborating on generalizing the
+divergence into a set of Rust libraries they can share.
+6.8 Decline
+Toward the end of the 2000s, the enthusiasm for virtual machines gave way to a growing skepticism. Garfinkel et
+al. [80] demonstrated that virtual machine environments could reliably be detected on close inspection, reviving
+the long-running tension between the ideals of strong isolation in virtual machines, and the reality of actual
+implementations. Buzen and Gagliardi [43] commented on the ideals in the early 1970s, stating “Since a
+14
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 18 of 45
+privileged software nucleus has, in principle, no way of determining whether it is running on a virtual or a real
+machine, it has no way of spying on or altering any other virtual machine that may be coexisting with it in the
+same system,” but in the same work they acknowledged, “In practice no virtual machine is completely equivalent
+to its real machine counterpart.”
+In 2010, Bratus et al. [37] criticized the disproportionate focus of systems security research on virtual machines
+and the resulting neglect of other potentially superior approaches to system security. Vasudevan et al. [195]
+outlined a set of requirements for protecting the integrity of virtual machines implemented on x86 with hardware
+virtualization support and evaluated all existing implementations as “unsuitable for use with highly sensitive
+applications” (p. 141). Colp et al. [53] observed that multitenant environments presented new risks for virtual
+machine implementations, because they required stronger isolation between guests sharing the same host than
+was necessary when a single tenant owned the entire physical machine.
+Virtual machines such as Xen, QEMU+KVM, Hyper-V, and VMware are still in active use today, but in recent
+years they have entirely ceded their reputation as the “hot new thing” to containers.
+7 MODERN CONTAINERS
+The collection of technologies that make up modern container implementations started coming together years
+before anyone used the term container. The two decade span surrounding the development of containers
+corresponded to a major shift in the way information about technological advances was broadcast and consumed.
+Exploring the socio-economic factors driving this shift is outside the scope of this survey; however, it is worth
+noting that the academic literature on more recent projects such as Docker and Kubernetes is largely written by
+outsiders providing external commentary rather than by the primary developers of the technologies. As a result,
+recent academic publications on containers tend to lack the depth of perspective and insight that was common to
+earlier publications on virtual machines, capabilities, and security in the Linux Kernel. The dialog driving
+innovation and improvements to the technology has not disappeared, but it has moved away from the academic
+literature and into other communication channels.
+7.1 POSIX Capabilities
+In the mid-1990s, the security working group of the POSIX standards project began drafting an extension to the
+POSIX.1 standard, called POSIX 1003.1e [3, 71, 90], which added a feature called capabilities. The
+implementation details of POSIX capabilities were entirely different than the early capability systems [201, p. 97]
+but had similarities on a conceptual level: POSIX capabilities were a set of flags associated with a process or file,
+which determined whether a process was permitted to perform certain actions, a process could exec a subprocess
+with a subset of its own capabilities, and the specification attempted to support the principle of least privilege [3].
+However, the POSIX capabilities did not adopt the concepts of small access domains and no-privilege defaults,
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 19 of 45
+which were crucial elements of secure isolation in the early capability systems [62]. The POSIX.1e draft was
+withdrawn from the process in 1998 and never formally adopted as a standard [90, p. 259], but it formed the basis
+of the capabilities feature added to the Linux Kernel in 1999 (release 2.2) [4, 132].
+7.2 Namespaces and Resource Controls
+A second important strand in the evolution of modern container implementations was the isolation of processes
+via namespaces and resource usage controls. In 2000, FreeBSD added Jails [105], which isolated filesystem
+namespaces (using chroot) but also isolated processes and network resources in such a way that a process might
+be granted root privileges inside the jail but blocked from performing operations that would affect anything
+outside the jail. In 2001, Linux VServer [182] patched the Linux Kernel to add resource usage limits and isolation
+for filesystems, network addresses, and memory. Around the same time, Virtuozzo (later released as OpenVZ) [98,
+135] also patched the Linux Kernel to add resource usage limits and isolation for filesystems, processes, users,
+devices, and interprocess communication (IPC). In 2003, Nagar et al. [146] proposed a framework for resource
+usage control and metering called Class-Based Kernel Resource Management (CKRM) and later released it as a
+set of patches to the Linux Kernel.
+In 2002, the Linux Kernel (release 2.4.19) introduced a filesystem namespaces feature [109]. In 2006,
+Biederman [33] proposed expanding the idea of namespace isolation in the Linux Kernel beyond the filesystem to
+process IDs, IPC, the network stack, and user IDs. The Kernel developers accepted the idea, and the patches to
+implement the features landed in the Kernel between 2006 and 2013 (releases 2.6.19 to 3.8) [109]. The last set of
+patches to be completed was user namespaces, which allow an unprivileged user to create a namespace and grant a
+process full privileges for operations inside that namespace while granting it no privileges for operations outside
+that namespace [11]. The way user namespaces are nested bears a resemblance to those of the capabilities of
+Dennis and Van Horn [65], where processes created more restricted subprocesses.
+In 2004, Solaris added Zones [164] (sometimes also called Solaris Containers), which isolated processes into
+groups that could only observe or signal other processes in the same group, associated each zone with an isolated
+filesystem namespace, and set limits for shared resource consumption (initially only CPU). Between 2006 and
+2007, Rohit Seth and Paul Menage worked on a patch for the Linux Kernel for a feature they called process
+containers [58]—later renamed to cgroups for “control groups”—which provided resource limiting, prioritization,
+accounting, and control features for processes.
+7.3 Access Control and System Call Filtering
+A third set of relevant features in the Linux Kernel evolved around secure isolation of processes through restricted
+access to system calls. In 2000, Cowan et al. [60] released SubDomain, a Linux Kernel module that added access
+control checks to a limited set of system calls related to executing processes. In 2001, Loscocco and Smalley [126]
+15
+16
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 20 of 45
+published an architectural description of SELinux, which implemented mandatory access control (MAC) for the
+Linux Kernel. The access control architecture of SELinux was received positively, but the implementation was
+rejected for being too tightly coupled with the kernel. So, in 2002, Wright et al. [216] proposed the Linux Security
+Module (LSM) framework as a more general approach to extensible security in the Linux Kernel, which made it
+possible for security policies to be loaded as Kernel modules. LSM is not an access control mechanism, but it
+provides a set of hooks where other security extensions such as SELinux or AppArmor can insert access control
+checks. LSM and a modified version of SELinux based on LSM were both merged into the mainline Linux Kernel
+in 2003. In 2004 to 2005, SubDomain was rewritten to use LSM and rebranded under the name AppArmor.
+In 2005, Arcangeli [22] released a set of patches to the Linux Kernel called seccomp for “secure computing,”
+which restricted a process so that it could only run an extremely limited set of system calls to exit/return or
+interact with already open filehandles and terminated a process attempting to run any other system calls. The
+patches were merged into the mainline Kernel later that year. However, the features of the original seccomp were
+inadequate and rarely used, and over the years multiple proposals to improve seccomp were unsuccessful. Then, in
+2012, Drewry [68] extended seccomp to allow filters for system calls to be dynamically defined using Berkeley
+Packet Filter (BPF) rules, which provided enough flexibility to make seccomp useful as an isolation technique. In
+2013, Krude and Meyer [115] implemented a framework for isolating untrusted workloads on multitenant
+infrastructures using seccomp system call filter policies written in BPF.
+7.4 Cluster Management
+A fourth relevant strand of technology evolved around resource sharing in large-scale cluster management. In
+2001, Lottiaux and Morin [127] used the term container for a form of shared, distributed memory that provided
+the illusion that multiple nodes in an SMP cluster were sharing kernel resources, including memory, disk, and
+network. In 2002, the Zap project [154] used the term pod for a group of processes sharing a private
+namespace, which had an isolated view of system resources such as process identifiers and network addresses.
+These pods were self-contained, so they could be migrated as a unit between physical machines. In the mid-2000s,
+Google deployed a cluster management solution called Borg [42, 196] into production, to orchestrate the
+deployment of their vast suite of web applications and services. Although the code for Borg has never been seen
+outside Google, it was the direct inspiration for the Kubernetes project a decade later [196, p.18:13–18:14]—the
+Borg alloc became the Kubernetes pod, Borglets became Kubelets, and tasks gave way to containers. Burns et al.
+[42, p. 70] explained that improving performance through resource utilization was one of the primary motivations
+for Borg.
+7.5 Combined Features
+17
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 21 of 45
+The strength of modern containers is not in any one feature but in the combination of multiple features for
+resource control and isolation. In 2008, Linux Containers (LXC) [6] combined cgroups, namespaces, and
+capabilities from the Linux Kernel into a tool for building and launching low-level system containers. Miller and
+Chen [142] demonstrated that filesystem isolation between LXC containers could be improved by applying
+SELinux policies. Xavier et al. [219] and Raho et al. [166] contrasted LXC's approach to isolation and resource
+control using standard Linux Kernel features such as cgroups and filesystem, process, IPC, and network
+namespaces, versus the approaches taken by Linux VServer and OpenVZ using custom patches to the Linux Kernel
+to provide similar features.
+Docker [141] launched in 2013 as a container management platform built on LXC. In 2014, Docker replaced LXC
+with libcontainer, its own implementation for creating containers, which also used Linux Kernel namespaces,
+cgroups, and capabilities [99, 166]. Morabito et al. [144] compared the performance of LXC and Docker after the
+transition to libcontainer and found them to be roughly equivalent on CPU performance, disk I/O, and network
+I/O; however, LXC performed 30% better on random writes, which may have been related to Docker's use of a
+union file system. Raho et al. [166] contrasted the implementations of Docker, QEMU+KVM, and Xen on the
+ARM hardware architecture. Mattetti et al. [134] experimented with dynamically generating AppArmor rules for
+Docker containers based on the application workload they contained. Catuogno and Galdi [45] performed a case
+study of Docker using two different models for security assessment. They built on the work of Reshetova et al.
+[167] in classifying vulnerabilities by the goal of the attack: denial of service, container compromise, or privilege
+escalation.
+In 2015, Docker split the container runtime out into a separate project, runc, in support of a vendor-neutral
+container runtime specification maintained by the Open Container Initiative (OCI). Hykes [100] highlighted that
+SELinux, AppArmor, and seccomp were all standard supported features in runc. Koller and Williams [113]
+observed that runc was more minimal than the Docker runtime while still using the same isolation mechanisms
+from the Linux Kernel, such as namespaces and cgroups. In 2016, Docker and CoreOS merged their container
+image formats into a vendor-neutral container image format specification, also at OCI [36].
+7.6 Orchestration
+In 2014, Docker began working on Swarm, described as a clustering system for Docker, which they ultimately
+released late in 2015 [128]. Also in 2014, Google began developing Kubernetes, an orchestration tool for deploying
+and managing the lifecycle of containers, which they released in the middle of 2015 [38]. Also in 2014, Canonical
+began developing LXD, a container orchestration tool for LXC containers, which they released in 2016 [89].
+Verma et al. [196] outlined the design goals behind Kubernetes, in the context of lessons learned from Borg. Syed
+and Fernandez [189, 190] pointed out that the performance advantages of the higher-level container
+orchestration tools, such as Kubernetes and Docker Swarm, were primarily a matter of improving resource
+utilization. They also contrasted the portability advantages of managing containers across multiple physical host
+18
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 22 of 45
+machines against the increased complexity required for the orchestration tools to advance beyond managing a
+single machine host. Souppaya et al. [184] systematically reviewed increased security risks and mitigation
+techniques for container orchestration tools. Bila et al. [34] extended Kubernetes with a vulnerability scanning
+service and network quarantine for containers.
+7.7 Trade-Offs
+Containers have a reputation for substantially better performance than virtual machines; however, that reputation
+may not be deserved. In 2015, Felter et al. [76] measured the performance of Docker against QEMU+KVM and
+determined that neither had significant overhead on CPU and memory usage, but that KVM had a 40% higher
+overhead in I/O. They observed that the overhead was primarily due to extra cycles on each I/O operation, so the
+impact could be mitigated for some applications by batching multiple small I/O operations into fewer large I/O
+operations. In 2017, Kovács [114] compared CPU execution time and network throughput between Docker, LXC,
+Singularity, KVM, and bare metal, and determined that there was no significant variation between them, as long as
+Docker and LXC were running in host networking mode, but in Linux bridge mode Docker and LXC exhibited high
+retransmission rates that negatively impacted their throughput compared to the others. Manco et al. [131]
+demonstrated that Xen virtual machine instantiation could be 50 to 200 times faster than Docker container
+instantiation, with a few low-level modifications to Xen's control stack.
+Secure isolation technologies have been the core of modern container implementations from the beginning, so it
+would be reasonable to expect that containers would provide a strong form of isolation. However, early
+implementations of containers were prone to preventable security vulnerabilities, which may indicate that security
+was not a primary design consideration, at least not initially. Combe et al. [54] analyzed security vulnerabilities in
+Docker and libcontainer between 2014 and 2015, and determined that the majority were related to filesystem
+isolation, which led to privilege escalation when Docker was run as the root user. They also suggested that some of
+Docker's sane default configurations for the isolation features of the Linux Kernel could be easily switched to less
+secure configurations through standard options to the docker command-line tool or the Docker daemon, and so
+might be prone to user error. Martin et al. [133] surveyed vulnerabilities in Docker images, libcontainer, the
+Docker daemon, and orchestration tools, as well as the unique security challenges of containers in multitenant
+infrastructures. In addition to security patches for specific privilege escalation vulnerabilities, there has been
+ongoing work to integrate support for user namespaces into Docker and Kubernetes, so they can run as a nonroot user and limit the scope of damage from privilege escalation. However, the user namespaces feature itself has
+had a series of vulnerabilities related to interfaces in the Kernel that were written with the expectation of being
+restricted to the root user but are now exposed to unprivileged users.
+One significant difference between virtual machine implementations and container implementations is that
+containers share a kernel with the host operating system, so efforts to secure the kernel greatly impact the security
+of containers. Reshetova et al. [167] considered the set of secure isolation features offered by the Linux Kernel as
+of 2014 (in the context of LXC) and judged them to have caught up with the features of FreeBSD Jails and Solaris
+19
+20
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 23 of 45
+Zones but highlighted some areas for improvement in support of containers. These improvements included
+integrating MAC into the Kernel as “security namespaces,” providing a way to lock down device hotplug features
+for containers and extending cgroups to support all resource management features supported by rlimits. Gao et al.
+[79] discussed the risks of certain types of information that containers can currently access from the Linux Kernel
+via procfs and sysfs—which can be exploited to detect co-resident containers and precisely target power
+consumption spikes to overload servers—and prototyped a power-based namespace to partition the information
+for containers.
+Some more recent approaches to secure isolation for containers have been inspired by virtual machine
+implementations. Kata Containers (formerly Intel Clear Containers) [5] wraps each Docker container or
+Kubernetes pod in a QEMU+KVM virtual machine [12]. They realized that QEMU was not ideal for the purpose—
+since it introduces a substantial performance hit compared to running bare containers, and the majority of the
+code relates to emulation that is not useful for wrapping containers—so a group at Intel started working on a
+stripped-down version of QEMU called NEMU [8]. X-Containers [179] used Xen's paravirtualization features to
+improve isolation between containers and the host but made an unfortunate trade-off of removing isolation
+between containers running on the same host. Nabla Containers [7] and gVisor [88] have both taken an approach
+of improving isolation by heavily filtering system calls from containers to the host kernel, which is a common
+technique for modern virtual machines.
+Bratus et al. [37] noted that the “self-protection” techniques employed by container implementations are a
+necessary path for future research, since even virtual machines depend on those techniques to protect themselves.
+Hosseinzadeh et al. [95] explored the possibility that container implementations might directly adapt earlier work
+(primarily Berger et al. [30]) for virtual machine implementations to integrate a Trusted Platform Module (TPM)
+as a virtual device.
+Container implementations have a potential advantage over virtual machine implementations in addressing the
+problem of secure isolation over the long-term, not because any existing implementations are inherently superior
+but because containers take a modular approach to implementation that permits them to be more flexible over
+time and across different underlying software and hardware architectures, as new ideas for secure isolation
+evolve.
+8 SECURITY OUTLOOK
+A series of vulnerabilities related to speculative execution and side-channel attacks rose to attention early in 2018.
+These vulnerabilities collectively upend traditional notions of secure isolation. The current reactionary approach—
+patching up each vulnerability as it is revealed—works in the short term but is a losing battle in the long term.
+21
+22
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 24 of 45
+Early in 2018, Kocher et al. [111] and Lipp et al. [124] published a set of vulnerabilities, respectively called Spectre
+and Meltdown, using techniques involving speculative execution and out-of-order execution. Spectre affects Intel,
+AMD, and ARM [111, p. 3], can be launched from any user process (including JavaScript code run in a browser)
+[111, p. 3], and grants access to any memory an attacked process could normally access [111, p. 5]. Meltdown
+affects Intel x86 architecture, can be launched from any user process, and grants full access to any physical
+memory on the same machine including kernel memory and memory allocated to any other process [124, p. 1]. In
+July 2018, Schwarz et al. [177] published a remote variant of Spectre, nicknamed NetSpectre, which is launched
+through packets over the network and grants access to any physical memory accessible to the attacked process. In
+August 2018, Van Bulck et al. [193] published a variant of Meltdown, nicknamed Foreshadow or more broadly “L1
+Terminal Fault” (L1TF), which is launched from unprivileged user space, and grants access to the L1 data cache,
+including encrypted data from Intel's Software Guard eXtensions (SGX). In November 2018, Canella et al. [44]
+reviewed the broad range of speculative execution vulnerabilities and proposed a comprehensive classification of
+the known variants and mitigations, which also revealed several previously unknown variants.
+The models of secure isolation employed by virtual machines and containers offer little protection from the
+speculative execution vulnerabilities. Containers are vulnerable to Meltdown, although virtual machines are not
+because they run a different kernel than the host [124, p. 12]. Both virtual machines and containers are vulnerable
+to Spectre [10, pp. 3, 5, 6], NetSpectre [177, p. 11], and L1TF [205], with varying degrees of compromise. Variants
+of L1TF are especially troublesome for virtual machines, because they allow an unprivileged process in the user
+space of a guest to access any memory on the physical machine, including memory allocated to other guests, the
+host operating system, and host kernel [13]. Multitenant infrastructures generally allow any tenant to deploy a
+virtual machine or container on any physical machine in the cloud or cluster, which means that it is viable to
+exploit these vulnerabilities by simply creating an account with a public provider and deploying malicious guests
+repeatedly, until one of them lands on a physical host with interesting secrets to steal.
+The techniques behind the speculative execution vulnerabilities were not new, but the combined application of the
+techniques was more sophisticated, and the security impact more severe, than previously considered possible.
+Although these vulnerabilities were only recently discovered and published by defensive security researchers, it
+is possible that offensive security researchers discovered and exploited them much earlier, and continue to
+exploit additional unpublished variants. Although mitigation patches have typically been applied quickly for the
+known variants of these vulnerabilities [9, 10], it is not feasible to entirely disable speculative execution [111, p.
+11] and out-of-order execution [124, p. 14], which are the primary vectors of the attacks, because the performance
+penalty is prohibitive, and in some cases the hardware simply has no mechanism to disable the features. The
+probability of further variants being discovered in the coming years is high. A substantial rethink of the
+fundamental hardware architecture could potentially eliminate the entire class of vulnerabilities, but in the
+research, development, and production timelines common to hardware vendors, such a significant change could
+take decades.
+Two notable alternative hardware architectures, CHERI and RISC-V, were already under development before the
+flood of speculative execution vulnerabilities were published. CHERI [215] combines concepts from classic
+capability systems and RISC architectures, with a strong emphasis on memory protection. RISC-V [24] is a RISC23
+24
+25
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 25 of 45
+based hardware architecture, aimed at providing an extensible open source instruction set architecture (ISA) used
+as an industry standard by a broad array of hardware vendors. Neither CHERI nor RISC-V were designed with
+speculative execution vulnerabilities in mind, but Watson et al. [204] observed that CHERI mitigates some
+aspects of Spectre and Meltdown but is vulnerable to speculative memory access, whereas Asanović and O'Connor
+[23] announced that RISC-V is not vulnerable because it does not perform speculative memory access. In August
+2018, Google announced that the open source implementation of its Titan project, providing a hardware root of
+trust, will likely be based on RISC-V [169]. MIT's Sanctum processor [59] was also based on RISC-V and
+demonstrated potential for secure hardware partitioning by adding a small secure CPU to the side of the main
+CPU. Hardware partitioning might provide a way to mitigate the speculative execution vulnerabilities in
+multitenant environments while avoiding major changes to the kernel and operating system. However, genuinely
+delivering the level of physical isolation that x86 promised would likely require logical partitioning of the main
+CPU, RAM, and cache of the machine, so the guests and the host operating system could share resources at the
+hardware level but be far more restricted at the software level than is currently possible.
+The problem of providing secure isolation for containers and virtual machines extends beyond simple refinements
+to their implementations. When the fundamental assumptions of a system are proven false, then any theorems
+built on those assumptions may also be false. The secure isolation features of the full stack—from the kernel and
+operating system, through to virtual machines, containers, and application workloads—are all built on false
+assumptions about the behavior of the hardware and will need to be re-examined.
+9 RELATED IMPLEMENTATIONS
+Implementation approaches that adopt the label “cloud” [67, 97, 125, 180] are typically virtual machines with
+added orchestration features to enhance portability. Cloud implementations also tend to favor lighter-weight guest
+images, which enhances performance and reduces complexity, although cloud images are generally not quite as
+minimal as container images.
+Implementation approaches that adopt the label “unikernel” [117, 129, 212] take minimalist guest images to an
+extreme, by replacing the kernel and operating system of the guest with a set of highly optimized libraries that
+provide the same functionality. The code for an application workload is compiled together with the small subset of
+unikernel libraries required by the application, resulting in a very small binary that runs directly as a guest image.
+Historically, unikernels have sacrificed portability of guest images, by targeting only a limited set of virtual
+machine implementations as their host, but recent work has begun exploring running unikernels as containers
+[213]. The unikernel approach also reduces the portability of application code, since unikernel frameworks tend to
+require the application code to be written in the same language as the unikernel libraries.
+Implementation approaches that adopt the label “serverless” [17, 93, 106, 113] tend to emphasize portability and
+minimizing complexity. They rely on the underlying infrastructure—typically some combination of bare metal,
+virtual machines, and/or containers—for whatever secure isolation and performance they provide.
+The Ideal Versus the Real: Revisiting the History of Virtual Machines and Containers 7/31/23, 2:53 PM
+https://dl.acm.org/doi/fullHtml/10.1145/3365199# Page 26 of 45
+10 CONCLUSION
+A detailed examination of the history of virtual machines and containers reveals that the two have evolved in
+tandem from the very beginning. It also reveals that both families of technology are facing significant challenges in
+providing secure isolation for modern multitenant infrastructures. In light of recent vulnerabilities, patching up
+existing tools is a necessary and valuable activity in the short term but is not sufficient for the long term. In the
+coming decades, the computing industry as a whole will need to embrace more radical alternatives in both
+hardware and software. Current researchers and developers can benefit from a deeper understanding of how
+virtual machines and containers evolved—and the trade-offs made along the way—to make more informed choices
+for tomorrow, avoid repeating past mistakes, and build on a solid foundation toward new paths of exploration.
+ACKNOWLEDGMENTS
+Thanks to Ravi Nair for help locating and scanning copies of several pivotal IBM papers on virtual machines from
+the 1960s that were no longer (or perhaps never) available in libraries or online. Thanks also to the reviewers
+(alphabetically): Clint Adams, Matthew Allen, Ross Anderson, Alastair Beresford, James Bottomley, Peter Capek,
+Damian Conway, Kees Cook, Jon Crowcroft, Mike Dodson, Tony Finch, Greg Kroah-Hartman, Anil
+Madhavapeddy, Ronald Minnich, Richard Mortier, Davanum Srinivas, Tom Sutcliffe, Zahra Tarkhani, and Daniel
+Thomas. Their feedback was greatly appreciated.
